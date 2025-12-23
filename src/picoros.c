@@ -272,9 +272,38 @@ picoros_res_t picoros_interface_init(picoros_interface_t* ifx) {
         _PR_LOG("Failed to start read/lease tasks! Error:%d\n", res);
         return PICOROS_ERROR;
     }
+    #if Z_FEATURE_MULTI_THREAD == 0
+        ifx->last_keepalive_time = z_clock_now();
+    #endif
 
     return PICOROS_OK;
 }
+
+#if Z_FEATURE_MULTI_THREAD == 0
+picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx){
+    z_result_t res = Z_OK;
+    res = zp_read(z_session_loan(&s_wrapper), ifx->read_opts);
+    if (res != Z_OK){
+        _PR_LOG("Read task error:%d\n", res);
+        return PICOROS_ERROR;
+    }
+    unsigned long elapsed_ms = z_clock_elapsed_ms(&ifx->last_keepalive_time);
+    if (elapsed_ms >= (Z_TRANSPORT_LEASE / Z_TRANSPORT_LEASE_EXPIRE_FACTOR)) {
+        ifx->last_keepalive_time = z_clock_now();
+        res = zp_send_keep_alive(z_session_loan(&s_wrapper), ifx->keep_alive_opts);
+        if (res != Z_OK){
+            _PR_LOG("Keep alive task error:%d\n", res);
+            return PICOROS_ERROR;
+        }
+        res = zp_send_join(z_session_loan(&s_wrapper), ifx->join_options);
+        if (res != Z_OK){
+            _PR_LOG("Join task error:%d\n", res);
+            return PICOROS_ERROR;
+        }
+    }
+    return PICOROS_OK;
+}
+#endif
 
 picoros_res_t picoros_node_init(picoros_node_t* node) {
     z_result_t res = Z_OK;
