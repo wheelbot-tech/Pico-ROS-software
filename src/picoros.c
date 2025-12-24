@@ -306,7 +306,8 @@ picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx){
 #endif
 
 bool picoros_interface_is_up(void) {
-    return zp_read_task_is_running(z_session_loan(&s_wrapper));
+    return ( zp_read_task_is_running(z_session_loan(&s_wrapper))
+    || zp_lease_task_is_running(z_session_loan(&s_wrapper)) );
 }
 
 void picoros_interface_close(void) {

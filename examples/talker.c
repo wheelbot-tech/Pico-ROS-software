@@ -91,7 +91,7 @@ int main(int argc, char **argv){
             z_sleep_s(1);
         }
         else{
-            printf("Connection lost.\n")
+            printf("Connection lost.\n");
             picoros_stop();
             z_sleep_s(1);
             picoros_init(&ifx);
