@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <csignal>
 #include "picoros.h"
 #include "picoserdes.h"
 #include "zenoh-pico/system/common/platform.h"
@@ -21,7 +22,9 @@ constexpr const char* MODE = "client";
 constexpr const char* LOCATOR = "tcp/192.168.1.16:7447";
 
 // Common utils
-extern "C" int picoros_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern "C" int sys_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern "C" volatile sig_atomic_t picoros_keep_running;
+extern "C" void sys_setup_sigint_handler(void);
 
 // Example Publisher
 picoros_publisher_t publisher = {
@@ -74,11 +77,11 @@ int main(int argc, char **argv) {
         .mode = const_cast<char*>(MODE),
         .locator = const_cast<char*>(LOCATOR),
     };
-    int ret = picoros_parse_args(argc, argv, &ifx);
-
+    int ret = sys_parse_args(argc, argv, &ifx);
     if (ret != 0) {
         return ret;
     }
+
 
     std::printf("Starting pico-ros interface %s %s\n", ifx.mode, ifx.locator);
     while (picoros_interface_init(&ifx) == PICOROS_NOT_READY) {
@@ -92,9 +95,15 @@ int main(int argc, char **argv) {
     std::printf("Declaring publisher on %s\n", publisher.topic.name);
     picoros_publisher_declare(&node, &publisher);
 
-    while (true) {
+    sys_setup_sigint_handler();
+    while (picoros_keep_running) {
         publish_jointState();
         z_sleep_s(1);
     }
+
+    std::printf("Closing interface and cleaning up...\n");
+    picoros_publisher_drop(&publisher);
+    picoros_interface_close();
+
     return 0;
 }

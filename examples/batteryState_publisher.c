@@ -2,16 +2,17 @@
  * @file    batteryState_publisher.c
  * @brief   Example batteryState publisher node for picoros
  * @date    2025-Aug-20
- * 
+ *
  * @details This example demonstrates a ROS publisher node that publishes
  *          simulated batteryState messages on the "battery_state" topic.
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
-  
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoserdes.h"
 
@@ -20,7 +21,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Example Publisher
 picoros_publisher_t pub_bs = {
@@ -68,8 +71,7 @@ int main(int argc, char **argv){
         .mode = MODE,
         .locator = LOCATOR,
     };
-    int ret = picoros_parse_args(argc, argv , &ifx);
-
+    int ret = sys_parse_args(argc, argv , &ifx);
     if(ret != 0){
         return ret;
     }
@@ -86,9 +88,15 @@ int main(int argc, char **argv){
     printf("Declaring publisher on %s\n", pub_bs.topic.name);
     picoros_publisher_declare(&node, &pub_bs);
 
-    while(true){
+    sys_setup_sigint_handler();
+    while(picoros_keep_running){
         publish_batteyState();
         z_sleep_s(1);
     }
+
+    printf("Closing interface and cleaning up...\n");
+    picoros_publisher_drop(&pub_bs);
+    picoros_interface_close();
+
     return 0;
 }

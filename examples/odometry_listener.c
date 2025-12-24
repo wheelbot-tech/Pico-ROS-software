@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoserdes.h"
 
@@ -19,7 +20,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Subscriber callback
 void odometry_callback(uint8_t* rx_data, size_t data_len);
@@ -57,8 +60,7 @@ int main(int argc, char **argv){
         .mode = MODE,
         .locator = LOCATOR,
     };
-    int ret = picoros_parse_args(argc, argv , &ifx);
-
+    int ret = sys_parse_args(argc, argv , &ifx);
     if(ret != 0){
         return ret;
     }
@@ -74,8 +76,14 @@ int main(int argc, char **argv){
     printf("Declaring subscriber on %s\n", sub_odo.topic.name);
     picoros_subscriber_declare(&node, &sub_odo);
 
-    while(true){
+    sys_setup_sigint_handler();
+    while(picoros_keep_running){
         z_sleep_s(1);
     }
+
+    printf("Closing interface and cleaning up...\n");
+    picoros_subscriber_drop(&sub_odo);
+    picoros_interface_close();
+
     return 0;
 }

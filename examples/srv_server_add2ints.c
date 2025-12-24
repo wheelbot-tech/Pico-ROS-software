@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoserdes.h"
 
@@ -19,7 +20,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Service callback
 picoros_service_reply_t add2_srv_cb(picoros_srv_server_t* server, uint8_t* request, size_t size);
@@ -68,7 +71,7 @@ int main(int argc, char **argv){
         .mode = MODE,
         .locator = LOCATOR,
     };
-    int ret = picoros_parse_args(argc, argv , &ifx);
+    int ret = sys_parse_args(argc, argv , &ifx);
     if(ret != 0){
         return ret;
     }
@@ -84,8 +87,14 @@ int main(int argc, char **argv){
     printf("Declaring service on %s\n", add2_srv.topic.name);
     picoros_service_declare(&node, &add2_srv);
 
-    while(true){
+    sys_setup_sigint_handler();
+    while(picoros_keep_running){
         z_sleep_s(1);
     }
+
+    printf("Closing interface and cleaning up...\n");
+    picoros_service_drop(&add2_srv);
+    picoros_interface_close();
+
     return 0;
 }
