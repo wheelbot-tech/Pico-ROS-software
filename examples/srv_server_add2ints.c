@@ -94,6 +94,7 @@ int main(int argc, char **argv){
 
     printf("Closing interface and cleaning up...\n");
     picoros_service_drop(&add2_srv);
+    picoros_node_drop(&node);
     picoros_interface_close();
 
     return 0;

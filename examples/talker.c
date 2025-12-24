@@ -65,6 +65,7 @@ void picoros_init(picoros_interface_t* ifx){
 void picoros_stop(void){
     printf("Closing interface and cleaning up...\n");
     picoros_publisher_drop(&pub_log);
+    picoros_node_drop(&node);
     picoros_interface_close();
 }
 
@@ -90,6 +91,7 @@ int main(int argc, char **argv){
             z_sleep_s(1);
         }
         else{
+            printf("Connection lost.\n")
             picoros_stop();
             z_sleep_s(1);
             picoros_init(&ifx);

@@ -96,6 +96,7 @@ int main(int argc, char **argv){
 
     printf("Closing interface and cleaning up...\n");
     picoros_publisher_drop(&pub_bs);
+    picoros_node_drop(&node);
     picoros_interface_close();
 
     return 0;

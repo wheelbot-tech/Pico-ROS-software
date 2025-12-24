@@ -76,6 +76,7 @@ int main(int argc, char **argv){
 
     printf("Closing interface and cleaning up...\n");
     picoros_subscriber_drop(&sub_log);
+    picoros_node_drop(&node);
     picoros_interface_close();
 
     return 0;

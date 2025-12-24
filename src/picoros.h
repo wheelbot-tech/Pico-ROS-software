@@ -109,6 +109,7 @@ typedef struct picoros_srv_server_s{
     rmw_attachment_t         attachment;     /**< RMW attachment data */
     void*                    user_data;      /**< User data, not used by picoros */
     picoros_srv_server_cb_t  user_callback;  /**< User callback for service handling */
+    z_owned_liveliness_token_t lv_token;     /**< Liveliness token for service discovery */
 } picoros_srv_server_t;
 
 /** @} */
@@ -168,6 +169,7 @@ typedef struct {
     rmw_attachment_t   attachment;  /**< RMW attachment data */
     rmw_topic_t        topic;       /**< Topic information */
     z_publisher_options_t opts;     /**< Topic options, if NULL default options are used */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for publisher discovery */
 } picoros_publisher_t;
 
 /** @} */
@@ -194,6 +196,7 @@ typedef struct {
     z_owned_subscriber_t zsub;         /**< Zenoh subscriber instance */
     rmw_topic_t         topic;         /**< Topic information */
     picoros_sub_cb_t    user_callback; /**< User callback for data handling */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for subscriber discovery */
 } picoros_subscriber_t;
 
 /** @} */
@@ -211,6 +214,7 @@ typedef struct {
     const char* name;                  /**< Node name */
     uint32_t    domain_id;             /**< ROS domain ID */
     uint8_t     guid[RMW_GID_SIZE];    /**< Node GUID */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for node discovery */
 } picoros_node_t;
 
 /** @} */
@@ -286,6 +290,14 @@ void picoros_interface_close(void);
  * @ingroup node
  */
 picoros_res_t picoros_node_init(picoros_node_t* node);
+
+/**
+ * @brief Release resources allocated by node
+ * @param node Pointer to node instance
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup node
+ */
+picoros_res_t picoros_node_drop(picoros_node_t* node);
 
 /**
  * @brief Declare a publisher for a node

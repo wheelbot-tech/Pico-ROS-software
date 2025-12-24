@@ -78,6 +78,7 @@ int main(int argc, char **argv) {
 
     std::printf("Closing interface and cleaning up...\n");
     picoros_publisher_drop(&pub_log);
+    picoros_node_drop(&node);
     picoros_interface_close();
 
     return 0;
