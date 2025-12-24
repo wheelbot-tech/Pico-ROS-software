@@ -305,6 +305,15 @@ picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx){
 }
 #endif
 
+bool picoros_interface_is_up(void) {
+    return zp_read_task_is_running(z_session_loan(&s_wrapper));
+}
+
+void picoros_interface_close(void) {
+    z_close(z_session_loan_mut(&s_wrapper), NULL);
+    z_session_drop(z_session_move(&s_wrapper));
+}
+
 picoros_res_t picoros_node_init(picoros_node_t* node) {
     z_result_t res = Z_OK;
     char keyexpr[KEYEXPR_SIZE];
@@ -321,10 +330,6 @@ picoros_res_t picoros_node_init(picoros_node_t* node) {
         return PICOROS_ERROR;
     }
     return PICOROS_OK;
-}
-
-void zenoh_shutdown() {
-    z_session_drop(z_session_move(&s_wrapper));
 }
 
 picoros_res_t picoros_publisher_declare(picoros_node_t* node, picoros_publisher_t* pub) {
@@ -385,6 +390,10 @@ picoros_res_t picoros_publish(picoros_publisher_t* pub, uint8_t* payload, size_t
     return PICOROS_OK;
 }
 
+picoros_res_t picoros_publisher_drop(picoros_publisher_t* pub) {
+    return (z_undeclare_publisher(z_publisher_move(&pub->zpub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+}
+
 // Subscribe to a topic
 picoros_res_t picoros_subscriber_declare(picoros_node_t* node, picoros_subscriber_t* sub) {
     char keyexpr[KEYEXPR_SIZE];
@@ -418,6 +427,10 @@ picoros_res_t picoros_subscriber_declare(picoros_node_t* node, picoros_subscribe
         }
     }
     return PICOROS_OK;
+}
+
+picoros_res_t picoros_subscriber_drop(picoros_subscriber_t* sub) {
+    return (z_undeclare_subscriber(z_subscriber_move(&sub->zsub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
 }
 
 picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t* srv) {
@@ -458,6 +471,9 @@ picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t
     return PICOROS_OK;
 }
 
+picoros_res_t picoros_service_drop(picoros_srv_server_t* serv) {
+    return (z_undeclare_queryable(z_queryable_move(&serv->zqable)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+}
 
 picoros_res_t picoros_service_client_init(picoros_srv_client_t * client){
     if (client->_key_buf == NULL){
@@ -535,6 +551,8 @@ bool picoros_service_call_in_progress(picoros_srv_client_t* client){
     return client->_in_progress;
 }
 
-picoros_res_t picoros_unsubscribe(picoros_subscriber_t* sub) {
-    return (z_undeclare_subscriber(z_subscriber_move(&sub->zsub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+picoros_res_t picoros_service_client_drop(picoros_srv_client_t* client) {
+    z_free(client->_key_buf);
+    client->_key_buf = NULL;
+    return PICOROS_OK;
 }

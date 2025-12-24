@@ -108,9 +108,16 @@ picoros_res_t picoparams_init(picoros_node_t* node, picoparams_interface_t ifx){
     if(picoros_service_declare(node, &pserver.get_types_srv) != PICOROS_OK){ return PICOROS_ERROR; }
 
     return PICOROS_OK;
-
 }
 
+void picoparams_stop(void){
+    picoros_service_drop(&pserver.get_srv);
+    picoros_service_drop(&pserver.list_srv);
+    picoros_service_drop(&pserver.set_srv);
+    picoros_service_drop(&pserver.describe_srv);
+    picoros_service_drop(&pserver.set_atomic_srv);
+    picoros_service_drop(&pserver.get_types_srv);
+}
 
 /* Private functions ---------------------------------------------------------*/
 static size_t serialize_ros_ParameterValue(ucdrBuffer* writer, pp_ParameterValue* val){
