@@ -2,9 +2,9 @@
  * @file    picoparams.h
  * @brief   Pico-ROS Parameter Server Implementation
  * @date    2025-Jun-01
- * 
+ *
  * @details This module implements a ROS 2 compatible parameter server for embedded systems.
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
 
@@ -203,13 +203,17 @@ typedef struct {
 
 /**
  * @brief Initialize parameter server
- * @param server Parameter server instance
  * @param node ROS node
  * @param ifx Parameter interface
  * @return PICOROS_OK on success, error code otherwise
  */
-picoros_res_t picoparams_init(picoros_node_t* node, picoparams_interface_t ifx);
+ picoros_res_t picoparams_init(picoros_node_t* node, picoparams_interface_t ifx);
 
+ /**
+  * @brief Stop parameter server and release resources
+  * @return void
+  */
+void picoparams_stop(void);
 
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/

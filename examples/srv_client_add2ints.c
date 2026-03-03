@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoserdes.h"
 
@@ -19,7 +20,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Service reply callback
 void add2_client_cb(picoros_srv_client_t* client, uint8_t* reply_data, size_t reply_size,  bool error);
@@ -56,7 +59,7 @@ int main(int argc, char **argv){
         .mode = MODE,
         .locator = LOCATOR,
     };
-    int ret = picoros_parse_args(argc, argv , &ifx);
+    int ret = sys_parse_args(argc, argv , &ifx);
     if(ret != 0){
         return ret;
     }
@@ -69,9 +72,10 @@ int main(int argc, char **argv){
 
     picoros_service_client_init(&add2_client);
 
+    sys_setup_sigint_handler();
     int a = 0;
     int b = 100;
-    while(true){
+    while(picoros_keep_running){
         uint8_t buf[100];
         request_srv_AddTwoInts request = {.a=a, b=b};
         size_t len = ps_serialize(buf, &request, 100);
@@ -81,5 +85,10 @@ int main(int argc, char **argv){
         }
         z_sleep_ms(100);
     }
+
+    printf("Closing interface and cleaning up...\n");
+    picoros_service_client_drop(&add2_client);
+    picoros_interface_close();
+
     return 0;
 }

@@ -2,15 +2,16 @@
  * @file    talker.c
  * @brief   Example talker node for picoros
  * @date    2025-May-27
- * 
+ *
  * @details This example demonstrates a simple ROS publisher node that
  *          publishes string messages on the "picoros/chatter" topic.
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
 
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoserdes.h"
 
@@ -19,7 +20,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv, picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Example Publisher
 picoros_publisher_t pub_log = {
@@ -45,19 +48,9 @@ void publish_log(){
     picoros_publish(&pub_log, pub_buf, len);
 }
 
-int main(int argc, char **argv){
-    picoros_interface_t ifx = {
-        .mode = MODE,
-        .locator = LOCATOR,
-    };
-    int ret = picoros_parse_args(argc, argv , &ifx);
-
-    if(ret != 0){
-        return ret;
-    }
-
-    printf("Starting pico-ros interface %s %s\n", ifx.mode, ifx.locator );
-    while (picoros_interface_init(&ifx) == PICOROS_NOT_READY){
+void picoros_init(picoros_interface_t* ifx){
+    printf("Starting pico-ros interface %s %s\n", ifx->mode, ifx->locator );
+    while (picoros_interface_init(ifx) == PICOROS_NOT_READY){
         printf("Waiting RMW init...\n");
         z_sleep_s(1);
     }
@@ -67,10 +60,45 @@ int main(int argc, char **argv){
 
     printf("Declaring publisher on %s\n", pub_log.topic.name);
     picoros_publisher_declare(&node, &pub_log);
+}
 
-    while(true){
+void picoros_stop(void){
+    printf("Closing interface and cleaning up...\n");
+    picoros_publisher_drop(&pub_log);
+    picoros_node_drop(&node);
+    picoros_interface_close();
+}
+
+int main(int argc, char **argv){
+    picoros_interface_t ifx = {
+        .mode = MODE,
+        .locator = LOCATOR,
+    };
+    int ret = sys_parse_args(argc, argv , &ifx);
+    if(ret != 0){
+        return ret;
+    }
+    picoros_init(&ifx);
+
+    sys_setup_sigint_handler();
+    while(picoros_keep_running){
+      #if Z_FEATURE_AUTO_RECONNECT == 1
         publish_log();
         z_sleep_s(1);
+      #else
+        if (picoros_interface_is_up()){
+            publish_log();
+            z_sleep_s(1);
+        }
+        else{
+            printf("Connection lost.\n");
+            picoros_stop();
+            z_sleep_s(1);
+            picoros_init(&ifx);
+        }
+      #endif
     }
+
+    picoros_stop();
     return 0;
 }

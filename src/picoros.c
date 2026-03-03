@@ -305,6 +305,16 @@ picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx){
 }
 #endif
 
+bool picoros_interface_is_up(void) {
+    return ( zp_read_task_is_running(z_session_loan(&s_wrapper))
+    || zp_lease_task_is_running(z_session_loan(&s_wrapper)) );
+}
+
+void picoros_interface_close(void) {
+    z_close(z_session_loan_mut(&s_wrapper), NULL);
+    z_session_drop(z_session_move(&s_wrapper));
+}
+
 picoros_res_t picoros_node_init(picoros_node_t* node) {
     z_result_t res = Z_OK;
     char keyexpr[KEYEXPR_SIZE];
@@ -314,17 +324,16 @@ picoros_res_t picoros_node_init(picoros_node_t* node) {
 
     z_view_keyexpr_from_str(&ke, keyexpr);
 
-    z_owned_liveliness_token_t token;
-
-    if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &token, z_view_keyexpr_loan(&ke), NULL)) != Z_OK) {
+    if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &node->lv_token, z_view_keyexpr_loan(&ke), NULL)) != Z_OK) {
         _PR_LOG("Unable to declare node liveliness token! Error:%d\n", res);
         return PICOROS_ERROR;
     }
     return PICOROS_OK;
 }
 
-void zenoh_shutdown() {
-    z_session_drop(z_session_move(&s_wrapper));
+picoros_res_t picoros_node_drop(picoros_node_t* node) {
+    z_liveliness_token_drop(z_liveliness_token_move(&node->lv_token));
+    return PICOROS_OK;
 }
 
 picoros_res_t picoros_publisher_declare(picoros_node_t* node, picoros_publisher_t* pub) {
@@ -352,8 +361,7 @@ picoros_res_t picoros_publisher_declare(picoros_node_t* node, picoros_publisher_
         rmw_zenoh_topic_liveliness_keyexpr(node, &pub->topic, keyexpr, "MP");
         z_view_keyexpr_from_str(&ke2, keyexpr);
 
-        z_owned_liveliness_token_t token;
-        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &token, z_view_keyexpr_loan(&ke2), NULL)) != Z_OK) {
+        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &pub->lv_token, z_view_keyexpr_loan(&ke2), NULL)) != Z_OK) {
             _PR_LOG("Unable to declare publisher liveliness token! Error:%d\n", res);
             return PICOROS_ERROR;
         }
@@ -385,6 +393,11 @@ picoros_res_t picoros_publish(picoros_publisher_t* pub, uint8_t* payload, size_t
     return PICOROS_OK;
 }
 
+picoros_res_t picoros_publisher_drop(picoros_publisher_t* pub) {
+    z_liveliness_token_drop(z_liveliness_token_move(&pub->lv_token));
+    return (z_undeclare_publisher(z_publisher_move(&pub->zpub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+}
+
 // Subscribe to a topic
 picoros_res_t picoros_subscriber_declare(picoros_node_t* node, picoros_subscriber_t* sub) {
     char keyexpr[KEYEXPR_SIZE];
@@ -411,13 +424,17 @@ picoros_res_t picoros_subscriber_declare(picoros_node_t* node, picoros_subscribe
     if (sub->topic.type != NULL) {
         rmw_zenoh_topic_liveliness_keyexpr(node, &sub->topic, keyexpr, "MS");
         z_view_keyexpr_from_str(&ke, keyexpr);
-        z_owned_liveliness_token_t token;
-        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &token, z_view_keyexpr_loan(&ke), NULL)) != Z_OK) {
+        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &sub->lv_token, z_view_keyexpr_loan(&ke), NULL)) != Z_OK) {
             _PR_LOG("Unable to declare subscriber liveliness token! Error:%d\n", res);
             return PICOROS_ERROR;
         }
     }
     return PICOROS_OK;
+}
+
+picoros_res_t picoros_subscriber_drop(picoros_subscriber_t* sub) {
+    z_liveliness_token_drop(z_liveliness_token_move(&sub->lv_token));
+    return (z_undeclare_subscriber(z_subscriber_move(&sub->zsub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
 }
 
 picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t* srv) {
@@ -447,10 +464,9 @@ picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t
     }
     if (srv->topic.type != NULL) {
         z_view_keyexpr_t ke2;
-        z_owned_liveliness_token_t token;
         rmw_zenoh_topic_liveliness_keyexpr(node, &srv->topic, keyexpr, "SS");
         z_view_keyexpr_from_str(&ke2, keyexpr);
-        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &token, z_view_keyexpr_loan(&ke2), NULL)) != Z_OK) {
+        if ((res = z_liveliness_declare_token(z_session_loan(&s_wrapper), &srv->lv_token, z_view_keyexpr_loan(&ke2), NULL)) != Z_OK) {
             _PR_LOG("Unable to declare service liveliness token! Error:%d\n", res);
             return PICOROS_ERROR;
         }
@@ -458,6 +474,10 @@ picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t
     return PICOROS_OK;
 }
 
+picoros_res_t picoros_service_drop(picoros_srv_server_t* serv) {
+    z_liveliness_token_drop(z_liveliness_token_move(&serv->lv_token));
+    return (z_undeclare_queryable(z_queryable_move(&serv->zqable)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+}
 
 picoros_res_t picoros_service_client_init(picoros_srv_client_t * client){
     if (client->_key_buf == NULL){
@@ -535,6 +555,8 @@ bool picoros_service_call_in_progress(picoros_srv_client_t* client){
     return client->_in_progress;
 }
 
-picoros_res_t picoros_unsubscribe(picoros_subscriber_t* sub) {
-    return (z_undeclare_subscriber(z_subscriber_move(&sub->zsub)) == Z_OK) ? PICOROS_OK : PICOROS_ERROR;
+picoros_res_t picoros_service_client_drop(picoros_srv_client_t* client) {
+    z_free(client->_key_buf);
+    client->_key_buf = NULL;
+    return PICOROS_OK;
 }

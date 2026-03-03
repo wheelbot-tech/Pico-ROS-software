@@ -2,18 +2,35 @@
  * @file    common.c
  * @brief   Common utilities for picoros examples
  * @date    2025-May-27
- * 
+ *
  * @details This file provides common utility functions used across
  *          the example programs,
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
 
 #include "picoros.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <signal.h>
 
-int picoros_parse_args(int argc, char **argv, picoros_interface_t* ifx) {
+volatile sig_atomic_t picoros_keep_running = 1;
+
+void handle_sigint(int sig) {
+    (void)sig;
+    printf("\nGot SIGINT.\n");
+    if (picoros_keep_running == 0){
+        printf("Forcing stop.\n");
+        exit(-1);
+    }
+    picoros_keep_running = 0;
+}
+
+void sys_setup_sigint_handler(void) {
+    signal(SIGINT, handle_sigint);
+}
+
+int sys_parse_args(int argc, char **argv, picoros_interface_t* ifx) {
     int opt;
     while ((opt = getopt(argc, argv, "a:m:h")) != -1) {
         switch (opt) {
