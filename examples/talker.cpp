@@ -2,10 +2,10 @@
  * @file    talker.cpp
  * @brief   Example cpp talker node for picoros
  * @date    2025-Avg-8
- * 
+ *
  * @details This example demonstrates a simple ROS publisher node that
  *          publishes string messages on the "picoros/chatter" topic.
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
 

@@ -227,6 +227,12 @@ typedef struct {
 typedef struct {
     char* mode;                     /**< Connection mode (peer/client) */
     char* locator;                  /**< Network locator string */
+    #if Z_FEATURE_MULTI_THREAD == 0
+        z_clock_t                       last_keepalive_time; /**< Last time of sent keepalive message */
+        zp_read_options_t*              read_opts;           /**< Read options */
+        zp_send_keep_alive_options_t*   keep_alive_opts;     /**< Keep alive options */
+        zp_send_join_options_t*         join_options;        /**< Join options - multicast only */
+    #endif
 } picoros_interface_t;
 
 /** @} */
@@ -249,6 +255,17 @@ typedef enum {
  * @ingroup interface
  */
 picoros_res_t picoros_interface_init(picoros_interface_t* ifx);
+
+#if Z_FEATURE_MULTI_THREAD == 0
+/**
+ * @brief Run single threaded communication tasks.
+ * @param context Pointer to interface configuration.
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup interface
+ */
+picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx);
+
+#endif
 
 /**
  * @brief Shutdown the network interface
