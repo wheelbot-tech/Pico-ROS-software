@@ -37,30 +37,36 @@ static void rmw_zenoh_gen_attachment_gid(rmw_attachment_t* attachment) {
     }
 }
 
+// @ros2_lv/<domain_id>/<session_id>/<node_id>/<node_id>/<entity_kind>/<mangled_enclave>/<mangled_namespace>/<node_name>
 static int rmw_zenoh_node_liveliness_keyexpr(picoros_node_t* node, char* keyexpr) {
 #if USE_NODE_GUID == 1
     uint8_t* guid = node->guid;
 #endif
     z_id_t id = z_info_zid(z_session_loan(&s_wrapper));
     return snprintf(keyexpr, KEYEXPR_SIZE,
-            "@ros2_lv/%" PRIu32 "/%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/0/0/NN/%%/%%/"
+            "@ros2_lv/%" PRIu32 "/%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/"
 #if USE_NODE_GUID == 1
-            "%s_%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/"
 #else
-            "%s",
+            "0/0/"
 #endif
+            "NN/%%/%%/%s",
             node->domain_id,
             id.id[0], id.id[1],  id.id[2], id.id[3], id.id[4], id.id[5], id.id[6],
             id.id[7], id.id[8],  id.id[9], id.id[10], id.id[11], id.id[12], id.id[13],
             id.id[14], id.id[15],
 #if USE_NODE_GUID == 1
-            node->name, guid[0], guid[1], guid[2], guid[3],
+            guid[0], guid[1], guid[2], guid[3],
             guid[4], guid[5], guid[6], guid[7],
             guid[8], guid[9], guid[10], guid[11],
-            guid[12], guid[13], guid[14], guid[15]
-#else
-            node->name
+            guid[12], guid[13], guid[14], guid[15],
+
+            guid[0], guid[1], guid[2], guid[3],
+            guid[4], guid[5], guid[6], guid[7],
+            guid[8], guid[9], guid[10], guid[11],
+            guid[12], guid[13], guid[14], guid[15],
 #endif
+            node->name
            );
 }
 
@@ -80,6 +86,7 @@ static int rmw_zenoh_service_keyexpr(picoros_node_t* node, rmw_topic_t* topic, c
     }
 }
 
+// @ros2_lv/<domain_id>/<session_id>/<node_id>/<entity_id>/<entity_kind>/<mangled_enclave>/<mangled_namespace>/<node_name>/<mangled_qualified_name>/<type_name>/<type_hash>/<qos>
 static int rmw_zenoh_topic_liveliness_keyexpr(picoros_node_t* node, rmw_topic_t* topic, char *keyexpr, const char *entity_str) {
 #if USE_NODE_GUID == 1
     uint8_t* guid = node->guid;
@@ -110,7 +117,7 @@ static int rmw_zenoh_topic_liveliness_keyexpr(picoros_node_t* node, rmw_topic_t*
             "@ros2_lv/%" PRIu32 "/"
             "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/"
 #if USE_NODE_GUID == 1
-           "0/11/%s/%%/%%/%s_%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/%%%s/"
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/11/%s/%%/%%/%s/%%%s/"
 #else
             "0/11/%s/%%/%%/%s/%%%s/"
 #endif
@@ -120,13 +127,13 @@ static int rmw_zenoh_topic_liveliness_keyexpr(picoros_node_t* node, rmw_topic_t*
             id.id[0], id.id[1],  id.id[2], id.id[3], id.id[4], id.id[5], id.id[6],
             id.id[7], id.id[8],  id.id[9], id.id[10], id.id[11], id.id[12], id.id[13],
             id.id[14], id.id[15],
-            entity_str, node->name,
 #if USE_NODE_GUID == 1
             guid[0], guid[1], guid[2], guid[3],
             guid[4], guid[5], guid[6], guid[7],
             guid[8], guid[9], guid[10], guid[11],
             guid[12], guid[13], guid[14], guid[15],
 #endif
+            entity_str, node->name,
             topic_lv, topic->type, topic->rihs_hash
                );
 

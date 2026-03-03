@@ -40,8 +40,9 @@
 /** @brief Size of RMW GID (Global Identifier) */
 #define RMW_GID_SIZE 16u
 /** @brief Flag to enable/disable node GUID usage @ingroup picoros*/
+#ifndef USE_NODE_GUID
 #define USE_NODE_GUID 0
-
+#endif
 /* Exported types ------------------------------------------------------------*/
 
 /**
