@@ -40,8 +40,9 @@
 /** @brief Size of RMW GID (Global Identifier) */
 #define RMW_GID_SIZE 16u
 /** @brief Flag to enable/disable node GUID usage @ingroup picoros*/
+#ifndef USE_NODE_GUID
 #define USE_NODE_GUID 0
-
+#endif
 /* Exported types ------------------------------------------------------------*/
 
 /**
@@ -109,6 +110,7 @@ typedef struct picoros_srv_server_s{
     rmw_attachment_t         attachment;     /**< RMW attachment data */
     void*                    user_data;      /**< User data, not used by picoros */
     picoros_srv_server_cb_t  user_callback;  /**< User callback for service handling */
+    z_owned_liveliness_token_t lv_token;     /**< Liveliness token for service discovery */
 } picoros_srv_server_t;
 
 /** @} */
@@ -168,6 +170,7 @@ typedef struct {
     rmw_attachment_t   attachment;  /**< RMW attachment data */
     rmw_topic_t        topic;       /**< Topic information */
     z_publisher_options_t opts;     /**< Topic options, if NULL default options are used */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for publisher discovery */
 } picoros_publisher_t;
 
 /** @} */
@@ -194,6 +197,7 @@ typedef struct {
     z_owned_subscriber_t zsub;         /**< Zenoh subscriber instance */
     rmw_topic_t         topic;         /**< Topic information */
     picoros_sub_cb_t    user_callback; /**< User callback for data handling */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for subscriber discovery */
 } picoros_subscriber_t;
 
 /** @} */
@@ -211,6 +215,7 @@ typedef struct {
     const char* name;                  /**< Node name */
     uint32_t    domain_id;             /**< ROS domain ID */
     uint8_t     guid[RMW_GID_SIZE];    /**< Node GUID */
+    z_owned_liveliness_token_t lv_token; /**< Liveliness token for node discovery */
 } picoros_node_t;
 
 /** @} */
@@ -227,6 +232,12 @@ typedef struct {
 typedef struct {
     char* mode;                     /**< Connection mode (peer/client) */
     char* locator;                  /**< Network locator string */
+    #if Z_FEATURE_MULTI_THREAD == 0
+        z_clock_t                       last_keepalive_time; /**< Last time of sent keepalive message */
+        zp_read_options_t*              read_opts;           /**< Read options */
+        zp_send_keep_alive_options_t*   keep_alive_opts;     /**< Keep alive options */
+        zp_send_join_options_t*         join_options;        /**< Join options - multicast only */
+    #endif
 } picoros_interface_t;
 
 /** @} */
@@ -250,11 +261,28 @@ typedef enum {
  */
 picoros_res_t picoros_interface_init(picoros_interface_t* ifx);
 
+#if Z_FEATURE_MULTI_THREAD == 0
 /**
- * @brief Shutdown the network interface
+ * @brief Run single threaded communication tasks.
+ * @param context Pointer to interface configuration.
+ * @return PICOROS_OK on success, error code otherwise
  * @ingroup interface
  */
-void picoros_interface_shutdown(void);
+picoros_res_t picoros_single_threaded_loop(picoros_interface_t* ifx);
+
+#endif
+
+/**
+ * @brief Check if network interface is running
+ * @ingroup interface
+ */
+bool picoros_interface_is_up(void);
+
+/**
+ * @brief Close the network interface
+ * @ingroup interface
+ */
+void picoros_interface_close(void);
 
 /**
  * @brief Initialize a ROS node
@@ -263,6 +291,14 @@ void picoros_interface_shutdown(void);
  * @ingroup node
  */
 picoros_res_t picoros_node_init(picoros_node_t* node);
+
+/**
+ * @brief Release resources allocated by node
+ * @param node Pointer to node instance
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup node
+ */
+picoros_res_t picoros_node_drop(picoros_node_t* node);
 
 /**
  * @brief Declare a publisher for a node
@@ -284,6 +320,14 @@ picoros_res_t picoros_publisher_declare(picoros_node_t* node, picoros_publisher_
 picoros_res_t picoros_publish(picoros_publisher_t *pub, uint8_t *payload, size_t len);
 
 /**
+ * @brief Undeclare a publisher and release resources
+ * @param pub Pointer to publisher instance
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup publisher
+ */
+picoros_res_t picoros_publisher_drop(picoros_publisher_t *pub);
+
+/**
  * @brief Declare a subscriber for a node
  * @param node Pointer to node instance
  * @param sub Pointer to subscriber configuration
@@ -293,12 +337,12 @@ picoros_res_t picoros_publish(picoros_publisher_t *pub, uint8_t *payload, size_t
 picoros_res_t picoros_subscriber_declare(picoros_node_t* node, picoros_subscriber_t *sub);
 
 /**
- * @brief Unsubscribe from a topic
+ * @brief Unsubscribe from a topic and release resources
  * @param sub Pointer to subscriber instance
  * @return PICOROS_OK on success, error code otherwise
  * @ingroup subscriber
  */
-picoros_res_t picoros_unsubscribe(picoros_subscriber_t *sub);
+picoros_res_t picoros_subscriber_drop(picoros_subscriber_t *sub);
 
 /**
  * @brief Declare a service server for a node
@@ -308,6 +352,14 @@ picoros_res_t picoros_unsubscribe(picoros_subscriber_t *sub);
  * @ingroup service_server
  */
 picoros_res_t picoros_service_declare(picoros_node_t* node, picoros_srv_server_t* srv);
+
+/**
+ * @brief Undeclare a service server and release resources
+ * @param srv Pointer to service server instance
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup service_server
+ */
+picoros_res_t picoros_service_drop(picoros_srv_server_t* srv);
 
 
 /**
@@ -336,6 +388,14 @@ picoros_res_t picoros_service_call(picoros_srv_client_t* client, uint8_t* payloa
  * @ingroup service_client
  */
 bool picoros_service_call_in_progress(picoros_srv_client_t* client);
+
+/**
+ * @brief Release resources allocated by service client.
+ * @param client Pointer to client instance.
+ * @return PICOROS_OK on success, error code otherwise
+ * @ingroup service_client
+ */
+picoros_res_t picoros_service_client_drop(picoros_srv_client_t* client);
 
 #ifdef __cplusplus
 }

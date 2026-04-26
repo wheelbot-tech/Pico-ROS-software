@@ -2,16 +2,17 @@
  * @file    params_server.c
  * @brief   Example parameter server node for picoros
  * @date    2025-May-27
- * 
+ *
  * @details This example demonstrates a ROS parameter server implementation
  *          that handles needed requests to support configuration with rqt_reconfigure.
- * 
+ *
  * @copyright Copyright (c) 2025 Ubiquity Robotics
  *******************************************************************************/
 
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <signal.h>
 #include "picoros.h"
 #include "picoparams.h"
 
@@ -20,7 +21,9 @@
 #define LOCATOR     "tcp/192.168.1.16:7447"
 
 // Common utils
-extern int picoros_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern int sys_parse_args(int argc, char **argv,  picoros_interface_t* ifx);
+extern volatile sig_atomic_t picoros_keep_running;
+extern void sys_setup_sigint_handler(void);
 
 // Static buffer for service reply serialization, used from zenoh threads
 #define STATIC_BUF_SIZE 4096
@@ -90,7 +93,7 @@ int main(int argc, char **argv){
         .mode = MODE,
         .locator = LOCATOR,
     };
-    int ret = picoros_parse_args(argc, argv , &ifx);
+    int ret = sys_parse_args(argc, argv , &ifx);
     if(ret != 0){
         return ret;
     }
@@ -104,8 +107,8 @@ int main(int argc, char **argv){
     picoros_node_init(&node);
 
     picoparams_interface_t params_ifx = {
-            .f_ref = api_param_ref,
-            .f_get = api_param_get,
+        .f_ref = api_param_ref,
+        .f_get = api_param_get,
             .f_set = api_param_set,
             .f_describe = api_param_describe,
             .f_type = api_param_type,
@@ -120,9 +123,15 @@ int main(int argc, char **argv){
     }
     printf("Parameter server started\n");
 
-    while(true){
+    sys_setup_sigint_handler();
+    while(picoros_keep_running){
         z_sleep_s(1);
     }
+
+    printf("Closing interface and cleaning up...\n");
+    picoparams_stop();
+    picoros_interface_close();
+
     return 0;
 }
 
